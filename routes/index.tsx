@@ -9,7 +9,7 @@ export default define.page(function Home() {
   return (
     <div class="px-4 py-8 mx-auto fresh-gradient min-h-screen">
       <Head>
-        <title>Webgl, hmr sucks</title>
+        <title>Webgl Fundamentals</title>
       </Head>
       <div class="hidden">
         <Counter count={count} />
