@@ -24,6 +24,10 @@ function rand(arg1: number, arg2?: number): number {
   return between0and1 * arg1;
 }
 
+function randInt(arg1: number, arg2?: number): number {
+  return Math.ceil(rand(arg1, arg2) - (arg2 ? 0.5 : 0));
+}
+
 function drawCanvas() {
   const document = globalThis.document;
   if (!document) return;
@@ -31,8 +35,18 @@ function drawCanvas() {
   const canvas = globalThis.document.querySelector("canvas");
   if (!canvas) return;
 
-  const gl = canvas.getContext("webgl2");
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+
+  const gl = canvas.getContext("webgl2", { antialias: false });
   if (!gl) return;
+
+  canvas.onmousemove = (e) =>
+    updateGl(
+      gl,
+      e.clientX - ((e.target as HTMLCanvasElement)?.offsetLeft ?? 0),
+      e.clientY - ((e.target as HTMLCanvasElement)?.offsetTop ?? 0),
+    );
 
   updateGl(gl);
 }
@@ -91,7 +105,45 @@ function createProgram(
   return program;
 }
 
-function updateGl(gl: WebGL2RenderingContext) {
+function setRectangle(
+  gl: WebGL2RenderingContext,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const x1 = x;
+  const x2 = x + width;
+  const y1 = y;
+  const y2 = y + height;
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([
+      x1,
+      y1,
+      x2,
+      y1,
+      x1,
+      y2,
+      x1,
+      y2,
+      x2,
+      y1,
+      x2,
+      y2,
+    ]),
+    gl.STATIC_DRAW,
+  );
+}
+
+globalThis.__helpers = {
+  drawCanvas,
+};
+
+function updateGl(gl: WebGL2RenderingContext, x?: number, y?: number) {
+  x ??= gl.canvas.width / 2;
+  y ??= gl.canvas.height / 2;
+
   const vertexShader = createShader(gl, gl.VERTEX_SHADER, basicVert);
   const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, basicFrag);
   const program = createProgram(gl, vertexShader, fragmentShader);
@@ -101,11 +153,56 @@ function updateGl(gl: WebGL2RenderingContext) {
     "u_resolution",
   );
 
+  const translationLocation = gl.getUniformLocation(program, "u_translation");
+  const rotationLocation = gl.getUniformLocation(program, "u_rotation");
+
+  const colorLocation = gl.getUniformLocation(program, "u_color");
+
   const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
   const positionBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
-  const positions = [10, 20, 80, 20, 10, 30, 10, 30, 80, 20, 80, 30];
+  const positions = [
+    // left column
+    0,
+    0,
+    30,
+    0,
+    0,
+    150,
+    0,
+    150,
+    30,
+    0,
+    30,
+    150,
+    // top rung
+    30,
+    0,
+    100,
+    0,
+    30,
+    30,
+    30,
+    30,
+    100,
+    0,
+    100,
+    30,
+    //middle rung
+    30,
+    60,
+    67,
+    60,
+    30,
+    90,
+    30,
+    90,
+    67,
+    60,
+    67,
+    90,
+  ];
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
   const vertexArrayObject = gl.createVertexArray();
@@ -127,18 +224,22 @@ function updateGl(gl: WebGL2RenderingContext) {
     offset,
   );
 
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-  gl.clearColor(0, 0, 0, 0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
   gl.useProgram(program);
   gl.bindVertexArray(vertexArrayObject);
 
   gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
+  gl.uniform2fv(translationLocation, [x - 50, y - 30]);
+  const angleInRadians = -480 * Math.PI / 180;
+  gl.uniform2fv(rotationLocation, [
+    Math.sin(angleInRadians),
+    Math.cos(angleInRadians),
+  ]);
+
+  gl.uniform4f(colorLocation, rand(1), rand(1), rand(1), 1);
 
   const primitiveType = gl.TRIANGLES;
   const draw_offset = 0;
-  const count = 6;
+  const count = 18;
   gl.drawArrays(primitiveType, draw_offset, count);
 }
 
@@ -146,5 +247,5 @@ export default function WebglCanvas() {
   setTimeout(drawCanvas, 1);
 
   // 500px square canvas
-  return <canvas class="size-125 border mx-auto" />;
+  return <canvas class="size-200 border mx-auto" />;
 }
