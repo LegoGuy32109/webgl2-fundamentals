@@ -1,5 +1,6 @@
 // import largePointsFrag from "../shaders/largePoints.frag?raw";
 // import largPointsVert from "../shaders/largePoints.vert?raw";
+import { getRandomLch, oklchToRgb } from "@/color.ts";
 import basicFrag from "../shaders/basic.frag?raw";
 import basicVert from "../shaders/basic.vert?raw";
 
@@ -38,7 +39,10 @@ function drawCanvas() {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
 
-  const gl = canvas.getContext("webgl2", { antialias: false });
+  const gl = canvas.getContext("webgl2", {
+    antialias: false,
+    preserveDrawingBuffer: true,
+  });
   if (!gl) return;
 
   canvas.onmousemove = (e) =>
@@ -140,7 +144,11 @@ globalThis.__helpers = {
   drawCanvas,
 };
 
-function updateGl(gl: WebGL2RenderingContext, x?: number, y?: number) {
+function updateGl(
+  gl: WebGL2RenderingContext,
+  x?: number,
+  y?: number,
+) {
   x ??= gl.canvas.width / 2;
   y ??= gl.canvas.height / 2;
 
@@ -155,6 +163,7 @@ function updateGl(gl: WebGL2RenderingContext, x?: number, y?: number) {
 
   const translationLocation = gl.getUniformLocation(program, "u_translation");
   const rotationLocation = gl.getUniformLocation(program, "u_rotation");
+  const scaleLocation = gl.getUniformLocation(program, "u_scale");
 
   const colorLocation = gl.getUniformLocation(program, "u_color");
 
@@ -228,22 +237,30 @@ function updateGl(gl: WebGL2RenderingContext, x?: number, y?: number) {
   gl.bindVertexArray(vertexArrayObject);
 
   gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
-  gl.uniform2fv(translationLocation, [x - 50, y - 30]);
-  const angleInRadians = -480 * Math.PI / 180;
+  gl.uniform2fv(translationLocation, [x, y]);
+  const angleInRadians = rand(360) * Math.PI / 180;
   gl.uniform2fv(rotationLocation, [
     Math.sin(angleInRadians),
     Math.cos(angleInRadians),
   ]);
+  gl.uniform2fv(scaleLocation, [rand(4) - 2, rand(4) - 2]);
 
-  gl.uniform4f(colorLocation, rand(1), rand(1), rand(1), 1);
+  const randomDeg = new Date().getTime() * Math.PI / 720;
+  const stuff = getRandomLch(randomDeg);
+  const [R, G, B] = oklchToRgb(stuff.hue, stuff.chroma, stuff.lightness);
+
+  gl.uniform4f(colorLocation, R, G, B, .9);
 
   const primitiveType = gl.TRIANGLES;
   const draw_offset = 0;
   const count = 18;
   gl.drawArrays(primitiveType, draw_offset, count);
+  globalThis.requestAnimationFrame(drawCanvas);
 }
 
 export default function WebglCanvas() {
+  setTimeout(drawCanvas, 1);
+  setTimeout(drawCanvas, 1);
   setTimeout(drawCanvas, 1);
 
   // 500px square canvas
