@@ -3,17 +3,10 @@
 in vec2 a_position;
 
 uniform vec2 u_resolution;
-uniform vec2 u_translation;
-uniform vec2 u_rotation;
-uniform vec2 u_scale;
+uniform mat3 u_matrix;
 
 void main() {
-  vec2 scaledPosition = a_position * u_scale;
-  vec2 rotatedPosition = vec2(
-      scaledPosition.x * u_rotation.y + scaledPosition.y * u_rotation.x,
-      scaledPosition.y * u_rotation.y - scaledPosition.x * u_rotation.x
-    );
-  vec2 position = rotatedPosition + u_translation;
+  vec2 position = (u_matrix * vec3(a_position, 1)).xy;
 
   // convert position from pixels to 0 to 1
   vec2 zeroToOne = position / u_resolution;

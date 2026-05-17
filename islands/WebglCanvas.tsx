@@ -3,6 +3,7 @@
 import { getRandomLch, oklchToRgb } from "@/color.ts";
 import basicFrag from "../shaders/basic.frag?raw";
 import basicVert from "../shaders/basic.vert?raw";
+import { m3 } from "@/matrix.ts";
 
 function drawRectangle(
   gl: WebGL2RenderingContext,
@@ -161,9 +162,7 @@ function updateGl(
     "u_resolution",
   );
 
-  const translationLocation = gl.getUniformLocation(program, "u_translation");
-  const rotationLocation = gl.getUniformLocation(program, "u_rotation");
-  const scaleLocation = gl.getUniformLocation(program, "u_scale");
+  const matrixLocation = gl.getUniformLocation(program, "u_matrix");
 
   const colorLocation = gl.getUniformLocation(program, "u_color");
 
@@ -237,13 +236,13 @@ function updateGl(
   gl.bindVertexArray(vertexArrayObject);
 
   gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
-  gl.uniform2fv(translationLocation, [x, y]);
-  const angleInRadians = rand(360) * Math.PI / 180;
-  gl.uniform2fv(rotationLocation, [
-    Math.sin(angleInRadians),
-    Math.cos(angleInRadians),
-  ]);
-  gl.uniform2fv(scaleLocation, [rand(4) - 2, rand(4) - 2]);
+
+  const translationMatrix = m3.translation(x, y);
+  const rotationMatrix = m3.rotation(rand(360));
+  const scaleMatrix = m3.scaling(rand(5) - 2, rand(5) - 2);
+  let matrix = m3.multiply(translationMatrix, rotationMatrix);
+  matrix = m3.multiply(matrix, scaleMatrix);
+  gl.uniformMatrix3fv(matrixLocation, false, matrix);
 
   const randomDeg = new Date().getTime() * Math.PI / 720;
   const stuff = getRandomLch(randomDeg);
@@ -255,12 +254,10 @@ function updateGl(
   const draw_offset = 0;
   const count = 18;
   gl.drawArrays(primitiveType, draw_offset, count);
-  globalThis.requestAnimationFrame(drawCanvas);
+  setTimeout(drawCanvas, 200);
 }
 
 export default function WebglCanvas() {
-  setTimeout(drawCanvas, 1);
-  setTimeout(drawCanvas, 1);
   setTimeout(drawCanvas, 1);
 
   // 500px square canvas
