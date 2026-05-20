@@ -242,16 +242,20 @@ function updateGl(
 
   const something = Math.sin(time / 1000);
   const ease = easeInOutElastic(something);
+  const easeInverse = Math.max(1 - ease, 0);
   // console.log("Value:", something, "Ease:", ease);
-  const rot = -2 * Math.PI * (time * .0005);
+  const rot = -2 * Math.PI * ((time * .00005) % 1);
 
   let rotationMatrix = [];
   if (info?.x) {
     // not correct calculations to map desired angle of F bottom
     const xCoord = x - (width / 2);
     const yCoord = y - (height / 2);
-    const angleToMouse = Math.atan2(xCoord, yCoord);
-    rotationMatrix = m3.rotation(angleToMouse);
+    const angleToMouse = Math.atan2(xCoord, yCoord) - (8 * Math.PI / 4);
+    rotationMatrix = m3.rotation(
+      ease * angleToMouse + (easeInverse * rot),
+    );
+    console.log(angleToMouse, rot);
   } else {
     rotationMatrix = m3.rotation(rot);
   }
