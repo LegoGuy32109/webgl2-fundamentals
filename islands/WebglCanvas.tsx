@@ -1,9 +1,8 @@
-// import largePointsFrag from "../shaders/largePoints.frag?raw";
-// import largPointsVert from "../shaders/largePoints.vert?raw";
 import { getRandomLch, oklchToRgb } from "@/color.ts";
 import basicFrag from "../shaders/basic.frag?raw";
 import basicVert from "../shaders/basic.vert?raw";
 import { m3 } from "@/matrix.ts";
+import { easeInOutElastic } from "../animations.ts";
 
 function drawRectangle(
   gl: WebGL2RenderingContext,
@@ -26,34 +25,8 @@ function rand(arg1: number, arg2?: number): number {
   return between0and1 * arg1;
 }
 
-function randInt(arg1: number, arg2?: number): number {
+function _randInt(arg1: number, arg2?: number): number {
   return Math.ceil(rand(arg1, arg2) - (arg2 ? 0.5 : 0));
-}
-
-function drawCanvas() {
-  const document = globalThis.document;
-  if (!document) return;
-
-  const canvas = globalThis.document.querySelector("canvas");
-  if (!canvas) return;
-
-  canvas.width = canvas.clientWidth;
-  canvas.height = canvas.clientHeight;
-
-  const gl = canvas.getContext("webgl2", {
-    antialias: false,
-    preserveDrawingBuffer: true,
-  });
-  if (!gl) return;
-
-  canvas.onmousemove = (e) =>
-    updateGl(
-      gl,
-      e.clientX - ((e.target as HTMLCanvasElement)?.offsetLeft ?? 0),
-      e.clientY - ((e.target as HTMLCanvasElement)?.offsetTop ?? 0),
-    );
-
-  updateGl(gl);
 }
 
 function _makeManyRectangles(gl: WebGL2RenderingContext) {
@@ -110,7 +83,7 @@ function createProgram(
   return program;
 }
 
-function setRectangle(
+function _setRectangle(
   gl: WebGL2RenderingContext,
   x: number,
   y: number,
@@ -141,18 +114,43 @@ function setRectangle(
   );
 }
 
-globalThis.__helpers = {
-  drawCanvas,
-};
+function drawCanvas(time?: number) {
+  const document = globalThis.document;
+  if (!document) return;
+
+  const canvas = globalThis.document.querySelector("canvas");
+  if (!canvas) return;
+
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+
+  const gl = canvas.getContext("webgl2", {
+    antialias: false,
+    preserveDrawingBuffer: false,
+  });
+  if (!gl) return;
+
+  if (!canvas.onmousemove) {
+    canvas.onmousemove = ({ clientX, clientY, target }) => {
+      const { offsetLeft, offsetTop } = target as HTMLCanvasElement ?? {};
+      globalThis.__animation = {
+        x: clientX - offsetLeft,
+        y: clientY - offsetTop,
+      };
+    };
+  }
+  if (!canvas.onmouseleave) {
+    canvas.onmouseleave = () => {
+      globalThis.__animation = {};
+    };
+  }
+  updateGl(gl, time ?? 100);
+}
 
 function updateGl(
   gl: WebGL2RenderingContext,
-  x?: number,
-  y?: number,
+  time: number,
 ) {
-  x ??= gl.canvas.width / 2;
-  y ??= gl.canvas.height / 2;
-
   const vertexShader = createShader(gl, gl.VERTEX_SHADER, basicVert);
   const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, basicFrag);
   const program = createProgram(gl, vertexShader, fragmentShader);
@@ -237,16 +235,36 @@ function updateGl(
 
   gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
 
-  const translationMatrix = m3.translation(x, y);
-  const rotationMatrix = m3.rotation(rand(360));
-  const scaleMatrix = m3.scaling(rand(5) - 2, rand(5) - 2);
+  const info = globalThis.__animation;
+  const { width, height } = gl.canvas;
+  const x = info?.x ?? width / 2;
+  const y = info?.y ?? height / 2;
+
+  const something = Math.sin(time / 1000);
+  const ease = easeInOutElastic(something);
+  // console.log("Value:", something, "Ease:", ease);
+  const rot = -2 * Math.PI * (time * .0005);
+
+  let rotationMatrix = [];
+  if (info?.x) {
+    // not correct calculations to map desired angle of F bottom
+    const xCoord = x - (width / 2);
+    const yCoord = y - (height / 2);
+    const angleToMouse = Math.atan2(xCoord, yCoord);
+    rotationMatrix = m3.rotation(angleToMouse);
+  } else {
+    rotationMatrix = m3.rotation(rot);
+  }
+
+  const translationMatrix = m3.translation(width / 2, height / 2);
+  const scaleMatrix = m3.scaling(1.8, 1.8);
   let matrix = m3.multiply(translationMatrix, rotationMatrix);
   matrix = m3.multiply(matrix, scaleMatrix);
   gl.uniformMatrix3fv(matrixLocation, false, matrix);
 
   const randomDeg = new Date().getTime() * Math.PI / 720;
   const stuff = getRandomLch(randomDeg);
-  const [R, G, B] = oklchToRgb(stuff.hue, stuff.chroma, stuff.lightness);
+  const [R, G, B] = oklchToRgb(stuff.hue, 1.0, .6);
 
   gl.uniform4f(colorLocation, R, G, B, .9);
 
@@ -254,7 +272,8 @@ function updateGl(
   const draw_offset = 0;
   const count = 18;
   gl.drawArrays(primitiveType, draw_offset, count);
-  setTimeout(drawCanvas, 200);
+
+  requestAnimationFrame(drawCanvas);
 }
 
 export default function WebglCanvas() {
